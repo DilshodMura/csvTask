@@ -2,11 +2,7 @@
 using Database.Entities;
 using Domain.Models;
 using Repository.BusinessModels;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Service.ServiceModels;
 
 namespace Repository.MappingProfile
 {
@@ -14,8 +10,10 @@ namespace Repository.MappingProfile
     {
         public MappingProfiles()
         {
-            CreateMap<UserBusiness, UserDb>().ReverseMap();
-            CreateMap<IUser,UserBusiness>().ReverseMap();
+            //Mapper profiles for db, business and service models.
+            CreateMap<IUser,UserDb>();
+            CreateMap<UserDb, UserBusiness>();
+            CreateMap<User, UserBusiness>();
         }
     }
 }

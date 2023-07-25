@@ -1,71 +1,56 @@
-﻿using CsvHelper;
+﻿using AutoMapper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Domain.Models;
+using Domain.Repositories;
 using Domain.Services;
 using Service.ServiceModels;
 using System.Globalization;
-using System.Reflection;
 
 namespace Service.Services
 {
     public sealed class CsvParser : ICsvParser
     {
-        public IEnumerable<IUser> ParseCsvFile(Stream stream)
+        private readonly IMapper _mapper;
+        private readonly IUserRepository _userRepository;
+        public CsvParser(IMapper mapper, IUserRepository userRepository)
         {
-            var configuration = new CsvConfiguration(CultureInfo.InvariantCulture)
+            _mapper = mapper;
+            _userRepository = userRepository;
+        }
+
+        /// <summary>
+        /// Parsing csv file
+        /// </summary>
+        public async Task<IEnumerable<IUser>> ParseCsvFile(Stream stream)
+        {
+            using (var reader = new StreamReader(stream))
+            using (var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)))
             {
-                HasHeaderRecord = true,
-                Delimiter = ","
-            };
+                var records = csv.GetRecords<User>().ToList();
 
-            using var reader = new StreamReader(stream);
-            using var csv = new CsvReader(reader, configuration);
-
-            // Read the header row using the following method
-            if (!csv.ReadHeader())
-            {
-                // Handle the case where the header is not present in the CSV file
-                throw new Exception("CSV file does not contain a header row.");
-            }
-
-            var headers = csv.Context.HeaderRecord;
-            var userProperties = typeof(User).GetProperties(); // Use the concrete class 'User'
-
-            var propertyMappings = new Dictionary<string, PropertyInfo>();
-
-            // Dynamically map the headers to the IUser interface properties
-            foreach (var header in headers)
-            {
-                var matchingProperty = userProperties.FirstOrDefault(prop => string.Equals(prop.Name, header, StringComparison.OrdinalIgnoreCase));
-                if (matchingProperty != null)
+                var parsedUsers = new List<IUser>();
+                foreach (var user in records)
                 {
-                    propertyMappings[header] = matchingProperty;
-                }
-            }
-
-            var users = new List<User>();
-
-            while (csv.Read())
-            {
-                var user = new User();
-
-                foreach (var kvp in propertyMappings)
-                {
-                    var header = kvp.Key;
-                    var property = kvp.Value;
-
-                    var value = csv.GetField(header);
-                    if (value != null)
+                    var existingUser = await _userRepository.GetUserByUsernameAsync(user.UserName);
+                    if (existingUser != null)
                     {
-                        var convertedValue = Convert.ChangeType(value, property.PropertyType, CultureInfo.InvariantCulture);
-                        property.SetValue(user, convertedValue);
+                        // If the user exists, update their information
+                        _mapper.Map(user, existingUser);
+                        await _userRepository.AddOrUpdateUserAsync(existingUser);
+                        parsedUsers.Add(existingUser);
+                    }
+                    else
+                    {
+                        // If the user doesn't exist, add them as a new user
+                        var newUser = _mapper.Map<User>(user); // Or UserDb, depending on your implementation
+                        await _userRepository.AddOrUpdateUserAsync(newUser);
+                        parsedUsers.Add(newUser);
                     }
                 }
 
-                users.Add(user);
+                return parsedUsers;
             }
-
-            return users;
         }
     }
-}
+ }

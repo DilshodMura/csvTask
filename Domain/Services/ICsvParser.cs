@@ -4,6 +4,9 @@ namespace Domain.Services
 {
     public interface ICsvParser
     {
-        IEnumerable<IUser> ParseCsvFile(Stream stream);
+        /// <summary>
+        /// Parsing csv file
+        /// </summary>
+        public Task<IEnumerable<IUser>> ParseCsvFile(Stream stream);
     }
 }

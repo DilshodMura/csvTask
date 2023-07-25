@@ -27,17 +27,23 @@ namespace API.Controllers
             if (file.ContentType != "text/csv" && file.ContentType != "application/vnd.ms-excel")
                 return BadRequest("Invalid file format. Only CSV files are allowed.");
 
-            var users = _csvParsingService.ParseCsvFile(file.OpenReadStream());
-
-            foreach (var user in users)
+            try
             {
-                await _userRepository.AddOrUpdateUserAsync(user);
-            }
+                var users = await _csvParsingService.ParseCsvFile(file.OpenReadStream());
+                foreach (var user in users)
+                {
+                    await _userRepository.AddOrUpdateUserAsync(user);
+                }
 
-            return Ok(users);
+                return Ok("CSV file successfully uploaded and users added/updated.");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Error processing the CSV file: {ex.Message}");
+            }
         }
 
-        [HttpGet]
+        [HttpGet("getUsers")]
         public async Task<IActionResult> GetUsers(string sort = "asc", int limit = 10)
         {
             var users = await _userRepository.GetAllUsersAsync(sort, limit);
